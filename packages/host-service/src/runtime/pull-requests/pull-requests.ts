@@ -207,6 +207,7 @@ export class PullRequestRuntimeManager {
 
 		for (const workspace of allWorkspaces) {
 			try {
+				if (!workspace.worktreePath) continue;
 				const git = await this.git(workspace.worktreePath);
 				const branch = await getCurrentBranchName(git);
 				if (!branch) {

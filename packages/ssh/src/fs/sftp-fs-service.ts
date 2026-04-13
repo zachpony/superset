@@ -1,15 +1,15 @@
-import type { SFTPWrapper, Stats } from "ssh2";
-import type { SSHConnectionPool } from "../connection/connection-pool";
 import type {
+	FsContentMatch,
 	FsEntry,
 	FsEntryKind,
 	FsMetadata,
 	FsReadResult,
-	FsWriteResult,
 	FsSearchMatch,
-	FsContentMatch,
 	FsWatchEvent,
+	FsWriteResult,
 } from "@superset/workspace-fs/core";
+import type { SFTPWrapper, Stats } from "ssh2";
+import type { SSHConnectionPool } from "../connection/connection-pool";
 
 const MAX_READ_BYTES = 10 * 1024 * 1024; // 10MB default limit
 const WATCH_POLL_INTERVAL_MS = 2_000;
@@ -51,9 +51,7 @@ export class SftpFsService {
 
 	private resolvePath(absolutePath: string): string {
 		if (!absolutePath.startsWith(this.rootPath)) {
-			throw new Error(
-				`Path ${absolutePath} is outside root ${this.rootPath}`,
-			);
+			throw new Error(`Path ${absolutePath} is outside root ${this.rootPath}`);
 		}
 		return absolutePath;
 	}
@@ -75,10 +73,8 @@ export class SftpFsService {
 						kind: statsToKind(item.attrs as unknown as Stats),
 					}))
 					.sort((a, b) => {
-						if (a.kind === "directory" && b.kind !== "directory")
-							return -1;
-						if (a.kind !== "directory" && b.kind === "directory")
-							return 1;
+						if (a.kind === "directory" && b.kind !== "directory") return -1;
+						if (a.kind !== "directory" && b.kind === "directory") return 1;
 						return a.name.localeCompare(b.name);
 					});
 				resolve({ entries });
@@ -188,7 +184,10 @@ export class SftpFsService {
 
 		const data =
 			typeof input.content === "string"
-				? Buffer.from(input.content, (input.encoding as BufferEncoding) ?? "utf-8")
+				? Buffer.from(
+						input.content,
+						(input.encoding as BufferEncoding) ?? "utf-8",
+					)
 				: Buffer.from(input.content);
 
 		// Atomic write: write to temp file then rename
@@ -335,9 +334,7 @@ export class SftpFsService {
 					absolutePath: file.startsWith("/")
 						? file
 						: `${this.rootPath}/${file}`,
-					relativePath: file.startsWith("./")
-						? file.substring(2)
-						: file,
+					relativePath: file.startsWith("./") ? file.substring(2) : file,
 					line: lineNum,
 					column: col,
 					preview: preview.trim(),
@@ -355,7 +352,7 @@ export class SftpFsService {
 		const sftp = await this.getSftp();
 		let lastSnapshot = await this.buildSnapshot(sftp, resolvedPath);
 
-		const pollId = `${this.connectionId}:${resolvedPath}`;
+		const _pollId = `${this.connectionId}:${resolvedPath}`;
 
 		while (true) {
 			await new Promise((resolve) =>
@@ -363,10 +360,7 @@ export class SftpFsService {
 			);
 
 			try {
-				const currentSnapshot = await this.buildSnapshot(
-					sftp,
-					resolvedPath,
-				);
+				const currentSnapshot = await this.buildSnapshot(sftp, resolvedPath);
 				const events = this.diffSnapshots(lastSnapshot, currentSnapshot);
 				lastSnapshot = currentSnapshot;
 
@@ -375,9 +369,7 @@ export class SftpFsService {
 				}
 			} catch {
 				yield {
-					events: [
-						{ kind: "overflow", absolutePath: resolvedPath },
-					],
+					events: [{ kind: "overflow", absolutePath: resolvedPath }],
 				};
 			}
 		}
@@ -392,10 +384,7 @@ export class SftpFsService {
 			sftp.readdir(dirPath, (err, list) => {
 				if (err) return resolve(snapshot);
 				for (const item of list) {
-					snapshot.set(
-						`${dirPath}/${item.filename}`,
-						item.attrs.mtime,
-					);
+					snapshot.set(`${dirPath}/${item.filename}`, item.attrs.mtime);
 				}
 				resolve(snapshot);
 			});

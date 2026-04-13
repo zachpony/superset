@@ -1,6 +1,6 @@
-import { Client } from "ssh2";
-import type { ClientChannel, SFTPWrapper } from "ssh2";
 import { readFileSync } from "node:fs";
+import type { ClientChannel, SFTPWrapper } from "ssh2";
+import { Client } from "ssh2";
 import type { SSHConnectionOptions, SSHHostConfig } from "./types";
 
 const MAX_RECONNECT_ATTEMPTS = 5;
@@ -21,8 +21,8 @@ export class SSHConnectionPool {
 
 	async connect(options: SSHConnectionOptions): Promise<void> {
 		if (this.connections.has(options.id)) {
-			const existing = this.connections.get(options.id)!;
-			if (existing.state === "connected") return;
+			const existing = this.connections.get(options.id);
+			if (existing?.state === "connected") return;
 			await this.disconnect(options.id);
 		}
 
@@ -94,9 +94,7 @@ export class SSHConnectionPool {
 					}
 				} catch {
 					reject(
-						new Error(
-							`Failed to read private key: ${config.privateKeyPath}`,
-						),
+						new Error(`Failed to read private key: ${config.privateKeyPath}`),
 					);
 					return;
 				}
@@ -118,8 +116,7 @@ export class SSHConnectionPool {
 		entry.reconnectAttempts++;
 		entry.options.onReconnecting?.(entry.id, entry.reconnectAttempts);
 
-		const delay =
-			RECONNECT_BASE_DELAY_MS * 2 ** (entry.reconnectAttempts - 1);
+		const delay = RECONNECT_BASE_DELAY_MS * 2 ** (entry.reconnectAttempts - 1);
 		entry.reconnectTimer = setTimeout(async () => {
 			entry.client = new Client();
 			try {

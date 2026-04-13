@@ -116,7 +116,11 @@ export class GitWatcher {
 					worktreePath: workspaces.worktreePath,
 				})
 				.from(workspaces)
-				.all();
+				.all()
+				.filter(
+					(r): r is { id: string; worktreePath: string } =>
+						r.worktreePath !== null,
+				);
 		} catch {
 			return;
 		}

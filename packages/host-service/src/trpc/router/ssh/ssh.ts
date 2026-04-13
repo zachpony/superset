@@ -1,9 +1,9 @@
+import { SSHConnectionPool } from "@superset/ssh/connection";
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { sshHosts } from "../../../db/schema";
 import { protectedProcedure, router } from "../../index";
-import { SSHConnectionPool } from "@superset/ssh/connection";
 
 const pool = new SSHConnectionPool();
 
@@ -42,9 +42,15 @@ export const sshRouter = router({
 				})
 				.run();
 
-			return ctx.db.query.sshHosts
+			const created = ctx.db.query.sshHosts
 				.findFirst({ where: eq(sshHosts.id, id) })
-				.sync()!;
+				.sync();
+			if (!created)
+				throw new TRPCError({
+					code: "INTERNAL_SERVER_ERROR",
+					message: "Failed to create SSH host",
+				});
+			return created;
 		}),
 
 	updateHost: protectedProcedure
@@ -88,15 +94,17 @@ export const sshRouter = router({
 			if (fields.keepaliveInterval !== undefined)
 				updates.keepaliveInterval = fields.keepaliveInterval;
 
-			ctx.db
-				.update(sshHosts)
-				.set(updates)
-				.where(eq(sshHosts.id, id))
-				.run();
+			ctx.db.update(sshHosts).set(updates).where(eq(sshHosts.id, id)).run();
 
-			return ctx.db.query.sshHosts
+			const updated = ctx.db.query.sshHosts
 				.findFirst({ where: eq(sshHosts.id, id) })
-				.sync()!;
+				.sync();
+			if (!updated)
+				throw new TRPCError({
+					code: "INTERNAL_SERVER_ERROR",
+					message: "Failed to update SSH host",
+				});
+			return updated;
 		}),
 
 	removeHost: protectedProcedure

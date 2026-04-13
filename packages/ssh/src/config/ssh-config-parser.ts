@@ -1,6 +1,6 @@
-import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
+import { join } from "node:path";
 import type { SSHHostConfig } from "../connection/types";
 import { DEFAULT_SSH_CONFIG } from "../connection/types";
 
@@ -68,8 +68,7 @@ export function parseSSHConfig(
 					current.connectTimeout = Number.parseInt(value, 10) * 1000;
 					break;
 				case "serveraliveinterval":
-					current.serverAliveInterval =
-						Number.parseInt(value, 10) * 1000;
+					current.serverAliveInterval = Number.parseInt(value, 10) * 1000;
 					break;
 				case "serveralivecountmax":
 					current.serverAliveCountMax = Number.parseInt(value, 10);

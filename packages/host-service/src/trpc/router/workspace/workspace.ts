@@ -146,6 +146,13 @@ export const workspaceRouter = router({
 				});
 			}
 
+			if (!localWorkspace.worktreePath) {
+				throw new TRPCError({
+					code: "PRECONDITION_FAILED",
+					message: "SSH workspaces do not support local git status",
+				});
+			}
+
 			const git = await ctx.git(localWorkspace.worktreePath);
 			const status = await git.status();
 
@@ -184,8 +191,14 @@ export const workspaceRouter = router({
 
 				if (localProject) {
 					try {
-						const git = await ctx.git(localProject.repoPath);
-						await git.raw(["worktree", "remove", localWorkspace.worktreePath]);
+						if (localWorkspace.worktreePath) {
+							const git = await ctx.git(localProject.repoPath);
+							await git.raw([
+								"worktree",
+								"remove",
+								localWorkspace.worktreePath,
+							]);
+						}
 					} catch (err) {
 						console.warn("[workspace.delete] failed to remove worktree", {
 							workspaceId: input.id,

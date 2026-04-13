@@ -117,6 +117,7 @@ export const projectRouter = router({
 
 			for (const ws of localWorkspaces) {
 				try {
+					if (!ws.worktreePath) continue;
 					const git = await ctx.git(localProject.repoPath);
 					await git.raw(["worktree", "remove", ws.worktreePath]);
 				} catch (err) {

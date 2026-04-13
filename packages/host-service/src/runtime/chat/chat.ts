@@ -364,7 +364,10 @@ export class ChatRuntimeManager {
 			throw new Error(`Workspace not found: ${workspaceId}`);
 		}
 
-		const cwd = workspace.worktreePath;
+		const cwd = workspace.worktreePath ?? workspace.remotePath;
+		if (!cwd) {
+			throw new Error(`Workspace ${workspaceId} has no working directory`);
+		}
 
 		await this.runtimeResolver.prepareRuntimeEnv();
 

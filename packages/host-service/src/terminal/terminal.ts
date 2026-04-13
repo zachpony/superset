@@ -1,10 +1,10 @@
 import { existsSync } from "node:fs";
 import type { NodeWebSocket } from "@hono/node-ws";
+import { SSHConnectionPool } from "@superset/ssh/connection";
+import { SSHPtyBackend } from "@superset/ssh/pty";
 import { eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { type IPty, spawn } from "node-pty";
-import { SSHConnectionPool } from "@superset/ssh/connection";
-import { SSHPtyBackend } from "@superset/ssh/pty";
 import type { HostDb } from "../db";
 import { projects, sshHosts, terminalSessions, workspaces } from "../db/schema";
 import {
@@ -139,7 +139,11 @@ export function createTerminalSessionInternal({
 	}
 
 	// SSH workspace: spawn remote terminal
-	if (workspace.executionMode === "ssh" && workspace.sshHostId && workspace.remotePath) {
+	if (
+		workspace.executionMode === "ssh" &&
+		workspace.sshHostId &&
+		workspace.remotePath
+	) {
 		return createSSHTerminalSession({ terminalId, workspaceId, workspace, db });
 	}
 
@@ -260,11 +264,17 @@ function createSSHTerminalSession({
 }: {
 	terminalId: string;
 	workspaceId: string;
-	workspace: { sshHostId: string | null; remotePath: string | null; projectId: string };
+	workspace: {
+		sshHostId: string | null;
+		remotePath: string | null;
+		projectId: string;
+	};
 	db: HostDb;
 }): TerminalSession | { error: string } {
 	const hostConfig = workspace.sshHostId
-		? db.query.sshHosts.findFirst({ where: eq(sshHosts.id, workspace.sshHostId) }).sync()
+		? db.query.sshHosts
+				.findFirst({ where: eq(sshHosts.id, workspace.sshHostId) })
+				.sync()
 		: null;
 
 	if (!hostConfig) {
@@ -303,42 +313,58 @@ function createSSHTerminalSession({
 				},
 			});
 
-			const sshPty = new SSHPtyBackend(sshConnectionPool, {
-				connectionId,
-				cols: 120,
-				rows: 32,
-				cwd: workspace.remotePath ?? undefined,
-			}, {
-				onData: (data) => {
-					if (session.socket?.readyState === 1) {
-						sendMessage(session.socket, { type: "data", data });
-					} else {
-						bufferOutput(session, data);
-					}
+			const sshPty = new SSHPtyBackend(
+				sshConnectionPool,
+				{
+					connectionId,
+					cols: 120,
+					rows: 32,
+					cwd: workspace.remotePath ?? undefined,
 				},
-				onExit: (code) => {
-					session.exited = true;
-					session.exitCode = code;
-					db.update(terminalSessions)
-						.set({ status: "exited", endedAt: Date.now() })
-						.where(eq(terminalSessions.id, terminalId))
-						.run();
-					if (session.socket?.readyState === 1) {
-						sendMessage(session.socket, { type: "exit", exitCode: code, signal: 0 });
-					}
+				{
+					onData: (data) => {
+						if (session.socket?.readyState === 1) {
+							sendMessage(session.socket, { type: "data", data });
+						} else {
+							bufferOutput(session, data);
+						}
+					},
+					onExit: (code) => {
+						session.exited = true;
+						session.exitCode = code;
+						db.update(terminalSessions)
+							.set({ status: "exited", endedAt: Date.now() })
+							.where(eq(terminalSessions.id, terminalId))
+							.run();
+						if (session.socket?.readyState === 1) {
+							sendMessage(session.socket, {
+								type: "exit",
+								exitCode: code,
+								signal: 0,
+							});
+						}
+					},
 				},
-			});
+			);
 
 			await sshPty.spawn();
 			session.sshPty = sshPty;
 
 			db.insert(terminalSessions)
-				.values({ id: terminalId, originWorkspaceId: workspaceId, status: "active" })
-				.onConflictDoUpdate({ target: terminalSessions.id, set: { status: "active", endedAt: null } })
+				.values({
+					id: terminalId,
+					originWorkspaceId: workspaceId,
+					status: "active",
+				})
+				.onConflictDoUpdate({
+					target: terminalSessions.id,
+					set: { status: "active", endedAt: null },
+				})
 				.run();
 		} catch (error) {
 			session.exited = true;
-			const msg = error instanceof Error ? error.message : "SSH connection failed";
+			const msg =
+				error instanceof Error ? error.message : "SSH connection failed";
 			if (session.socket?.readyState === 1) {
 				sendMessage(session.socket, { type: "error", message: msg });
 			}

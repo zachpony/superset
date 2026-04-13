@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
 import type { HostDb } from "@superset/host-service/db";
 import { workspaces } from "@superset/host-service/db";
+import { eq } from "drizzle-orm";
 
 export interface WorkspaceContext {
 	mode: "local" | "ssh";

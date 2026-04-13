@@ -559,9 +559,7 @@ export const workspaceCreationRouter = router({
 				.mutate({
 					organizationId: ctx.organizationId,
 					projectId: input.projectId,
-					name:
-						input.workspaceName ??
-						`${host.name}:${input.branch}`,
+					name: input.workspaceName ?? `${host.name}:${input.branch}`,
 					branch: input.branch,
 					hostId: cloudHost.id,
 				})
