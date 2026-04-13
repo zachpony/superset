@@ -17,7 +17,13 @@ const result = await Bun.build({
 	outdir,
 	naming: "host-service.js",
 	format: "esm",
-	external: ["better-sqlite3", "node-pty", "@parcel/watcher"],
+	external: [
+		"better-sqlite3",
+		"node-pty",
+		"@parcel/watcher",
+		"cpu-features",
+		"ssh2",
+	],
 });
 
 if (!result.success) {

@@ -18,14 +18,8 @@ interface SSHConfigBlock {
 	serverAliveCountMax?: number;
 }
 
-export function parseSSHConfig(
-	configPath?: string,
-): Map<string, SSHConfigBlock> {
-	const path = configPath ?? join(homedir(), ".ssh", "config");
-	if (!existsSync(path)) return new Map();
-
-	const content = readFileSync(path, "utf-8");
-	const blocks = new Map<string, SSHConfigBlock>();
+export function parseSSHConfigString(content: string): SSHConfigBlock[] {
+	const blocks: SSHConfigBlock[] = [];
 	let current: SSHConfigBlock | null = null;
 
 	for (const rawLine of content.split("\n")) {
@@ -39,54 +33,78 @@ export function parseSSHConfig(
 		const value = line.substring(spaceIdx + 1).trim();
 
 		if (key === "host") {
-			if (current) blocks.set(current.host, current);
+			if (current) blocks.push(current);
 			current = { host: value };
 		} else if (current) {
-			switch (key) {
-				case "hostname":
-					current.hostname = value;
-					break;
-				case "port":
-					current.port = Number.parseInt(value, 10);
-					break;
-				case "user":
-					current.user = value;
-					break;
-				case "identityfile":
-					current.identityFile = value.replace("~", homedir());
-					break;
-				case "forwardagent":
-					current.forwardAgent = value.toLowerCase() === "yes";
-					break;
-				case "proxyjump":
-					current.proxyJump = value;
-					break;
-				case "stricthostkeychecking":
-					current.strictHostKeyChecking = value;
-					break;
-				case "connecttimeout":
-					current.connectTimeout = Number.parseInt(value, 10) * 1000;
-					break;
-				case "serveraliveinterval":
-					current.serverAliveInterval = Number.parseInt(value, 10) * 1000;
-					break;
-				case "serveralivecountmax":
-					current.serverAliveCountMax = Number.parseInt(value, 10);
-					break;
-			}
+			applyConfigKey(current, key, value);
 		}
 	}
 
-	if (current) blocks.set(current.host, current);
+	if (current) blocks.push(current);
 	return blocks;
+}
+
+function applyConfigKey(
+	block: SSHConfigBlock,
+	key: string,
+	value: string,
+): void {
+	switch (key) {
+		case "hostname":
+			block.hostname = value;
+			break;
+		case "port":
+			block.port = Number.parseInt(value, 10);
+			break;
+		case "user":
+			block.user = value;
+			break;
+		case "identityfile":
+			block.identityFile = value;
+			break;
+		case "forwardagent":
+			block.forwardAgent = value.toLowerCase() === "yes";
+			break;
+		case "proxyjump":
+			block.proxyJump = value;
+			break;
+		case "stricthostkeychecking":
+			block.strictHostKeyChecking = value;
+			break;
+		case "connecttimeout":
+			block.connectTimeout = Number.parseInt(value, 10) * 1000;
+			break;
+		case "serveraliveinterval":
+			block.serverAliveInterval = Number.parseInt(value, 10) * 1000;
+			break;
+		case "serveralivecountmax":
+			block.serverAliveCountMax = Number.parseInt(value, 10);
+			break;
+	}
+}
+
+export function parseSSHConfig(
+	configPath?: string,
+): Map<string, SSHConfigBlock> {
+	const path = configPath ?? join(homedir(), ".ssh", "config");
+	if (!existsSync(path)) return new Map();
+
+	const content = readFileSync(path, "utf-8");
+	const blocks = parseSSHConfigString(content);
+	const map = new Map<string, SSHConfigBlock>();
+	for (const block of blocks) {
+		map.set(block.host, block);
+	}
+	return map;
 }
 
 export function resolveSSHConfig(
 	hostAlias: string,
 	overrides: Partial<SSHHostConfig> = {},
+	configBlocks?: Map<string, SSHConfigBlock>,
 ): SSHHostConfig {
-	const configBlocks = parseSSHConfig();
-	const block = configBlocks.get(hostAlias);
+	const blocks = configBlocks ?? parseSSHConfig();
+	const block = blocks.get(hostAlias);
 
 	const strictMap: Record<string, SSHHostConfig["strictHostKeyChecking"]> = {
 		yes: "yes",
