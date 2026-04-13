@@ -70,6 +70,8 @@ export const SETTING_ITEM_ID = {
 
 	SECURITY_EXPOSE_HOST_SERVICE_VIA_RELAY:
 		"security-expose-host-service-via-relay",
+
+	SSH_HOSTS: "ssh-hosts",
 } as const;
 
 export type SettingItemId =
@@ -985,6 +987,25 @@ export const SETTINGS_ITEMS: SettingsItem[] = [
 			"security",
 			"privacy",
 			"development servers",
+		],
+	},
+	{
+		id: SETTING_ITEM_ID.SSH_HOSTS,
+		section: "ssh",
+		title: "SSH Hosts",
+		description: "Configure SSH hosts for remote development",
+		keywords: [
+			"ssh",
+			"remote",
+			"host",
+			"server",
+			"connection",
+			"key",
+			"private key",
+			"forward agent",
+			"port",
+			"username",
+			"development",
 		],
 	},
 	{

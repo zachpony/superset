@@ -10,6 +10,7 @@ import {
 	HiOutlineLockClosed,
 	HiOutlinePaintBrush,
 	HiOutlinePuzzlePiece,
+	HiOutlineServerStack,
 	HiOutlineShieldCheck,
 	HiOutlineSparkles,
 	HiOutlineUser,
@@ -37,7 +38,8 @@ type SettingsRoute =
 	| "/settings/billing"
 	| "/settings/api-keys"
 	| "/settings/security"
-	| "/settings/permissions";
+	| "/settings/permissions"
+	| "/settings/ssh";
 
 interface SectionItem {
 	id: SettingsRoute;
@@ -108,6 +110,12 @@ const SECTION_GROUPS: SectionGroup[] = [
 				section: "terminal",
 				label: "Terminal",
 				icon: <HiOutlineCommandLine className="h-4 w-4" />,
+			},
+			{
+				id: "/settings/ssh",
+				section: "ssh",
+				label: "SSH Hosts",
+				icon: <HiOutlineServerStack className="h-4 w-4" />,
 			},
 			{
 				id: "/settings/models",
