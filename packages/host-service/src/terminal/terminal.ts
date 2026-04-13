@@ -3,8 +3,10 @@ import type { NodeWebSocket } from "@hono/node-ws";
 import { eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { type IPty, spawn } from "node-pty";
+import { SSHConnectionPool } from "@superset/ssh/connection";
+import { SSHPtyBackend } from "@superset/ssh/pty";
 import type { HostDb } from "../db";
-import { projects, terminalSessions, workspaces } from "../db/schema";
+import { projects, sshHosts, terminalSessions, workspaces } from "../db/schema";
 import {
 	buildV2TerminalEnv,
 	getShellLaunchArgs,
@@ -37,9 +39,12 @@ type TerminalServerMessage =
 
 const MAX_BUFFER_BYTES = 64 * 1024;
 
+const sshConnectionPool = new SSHConnectionPool();
+
 interface TerminalSession {
 	terminalId: string;
-	pty: IPty;
+	pty: IPty | null;
+	sshPty: SSHPtyBackend | null;
 	socket: {
 		send: (data: string) => void;
 		close: (code?: number, reason?: string) => void;
@@ -90,7 +95,11 @@ function disposeSession(terminalId: string, db: HostDb) {
 
 	if (!session.exited) {
 		try {
-			session.pty.kill();
+			if (session.sshPty) {
+				session.sshPty.destroy();
+			} else if (session.pty) {
+				session.pty.kill();
+			}
 		} catch {
 			// PTY may already be dead
 		}
@@ -125,7 +134,17 @@ export function createTerminalSessionInternal({
 		.findFirst({ where: eq(workspaces.id, workspaceId) })
 		.sync();
 
-	if (!workspace || !existsSync(workspace.worktreePath)) {
+	if (!workspace) {
+		return { error: "Workspace not found" };
+	}
+
+	// SSH workspace: spawn remote terminal
+	if (workspace.executionMode === "ssh" && workspace.sshHostId && workspace.remotePath) {
+		return createSSHTerminalSession({ terminalId, workspaceId, workspace, db });
+	}
+
+	// Local workspace: existing behavior
+	if (!workspace.worktreePath || !existsSync(workspace.worktreePath)) {
 		return { error: "Workspace worktree not found" };
 	}
 
@@ -193,6 +212,7 @@ export function createTerminalSessionInternal({
 	const session: TerminalSession = {
 		terminalId,
 		pty,
+		sshPty: null,
 		socket: null,
 		buffer: [],
 		bufferBytes: 0,
@@ -228,6 +248,102 @@ export function createTerminalSessionInternal({
 			});
 		}
 	});
+
+	return session;
+}
+
+function createSSHTerminalSession({
+	terminalId,
+	workspaceId,
+	workspace,
+	db,
+}: {
+	terminalId: string;
+	workspaceId: string;
+	workspace: { sshHostId: string | null; remotePath: string | null; projectId: string };
+	db: HostDb;
+}): TerminalSession | { error: string } {
+	const hostConfig = workspace.sshHostId
+		? db.query.sshHosts.findFirst({ where: eq(sshHosts.id, workspace.sshHostId) }).sync()
+		: null;
+
+	if (!hostConfig) {
+		return { error: "SSH host configuration not found" };
+	}
+
+	const connectionId = `terminal-${terminalId}`;
+	const session: TerminalSession = {
+		terminalId,
+		pty: null,
+		sshPty: null,
+		socket: null,
+		buffer: [],
+		bufferBytes: 0,
+		exited: false,
+		exitCode: 0,
+		exitSignal: 0,
+	};
+	sessions.set(terminalId, session);
+
+	// Connect and spawn SSH PTY asynchronously
+	void (async () => {
+		try {
+			await sshConnectionPool.connect({
+				id: connectionId,
+				config: {
+					host: hostConfig.host,
+					port: hostConfig.port,
+					username: hostConfig.username,
+					privateKeyPath: hostConfig.privateKeyPath ?? undefined,
+					forwardAgent: hostConfig.forwardAgent === 1,
+					strictHostKeyChecking: "accept-new",
+					connectTimeout: hostConfig.connectTimeout,
+					keepaliveInterval: hostConfig.keepaliveInterval,
+					keepaliveCountMax: 3,
+				},
+			});
+
+			const sshPty = new SSHPtyBackend(sshConnectionPool, {
+				connectionId,
+				cols: 120,
+				rows: 32,
+				cwd: workspace.remotePath ?? undefined,
+			}, {
+				onData: (data) => {
+					if (session.socket?.readyState === 1) {
+						sendMessage(session.socket, { type: "data", data });
+					} else {
+						bufferOutput(session, data);
+					}
+				},
+				onExit: (code) => {
+					session.exited = true;
+					session.exitCode = code;
+					db.update(terminalSessions)
+						.set({ status: "exited", endedAt: Date.now() })
+						.where(eq(terminalSessions.id, terminalId))
+						.run();
+					if (session.socket?.readyState === 1) {
+						sendMessage(session.socket, { type: "exit", exitCode: code, signal: 0 });
+					}
+				},
+			});
+
+			await sshPty.spawn();
+			session.sshPty = sshPty;
+
+			db.insert(terminalSessions)
+				.values({ id: terminalId, originWorkspaceId: workspaceId, status: "active" })
+				.onConflictDoUpdate({ target: terminalSessions.id, set: { status: "active", endedAt: null } })
+				.run();
+		} catch (error) {
+			session.exited = true;
+			const msg = error instanceof Error ? error.message : "SSH connection failed";
+			if (session.socket?.readyState === 1) {
+				sendMessage(session.socket, { type: "error", message: msg });
+			}
+		}
+	})();
 
 	return session;
 }
@@ -384,14 +500,22 @@ export function registerWorkspaceTerminalRoute({
 					if (session.exited) return;
 
 					if (message.type === "input") {
-						session.pty.write(message.data);
+						if (session.sshPty) {
+							session.sshPty.write(message.data);
+						} else if (session.pty) {
+							session.pty.write(message.data);
+						}
 						return;
 					}
 
 					if (message.type === "resize") {
 						const cols = Math.max(20, Math.floor(message.cols));
 						const rows = Math.max(5, Math.floor(message.rows));
-						session.pty.resize(cols, rows);
+						if (session.sshPty) {
+							session.sshPty.resize(cols, rows);
+						} else if (session.pty) {
+							session.pty.resize(cols, rows);
+						}
 					}
 				},
 

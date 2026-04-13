@@ -8,6 +8,7 @@ import { healthRouter } from "./health";
 import { hostRouter } from "./host";
 import { projectRouter } from "./project";
 import { pullRequestsRouter } from "./pull-requests";
+import { sshRouter } from "./ssh";
 import { terminalRouter } from "./terminal";
 import { workspaceRouter } from "./workspace";
 import { workspaceCreationRouter } from "./workspace-creation";
@@ -22,6 +23,7 @@ export const appRouter = router({
 	cloud: cloudRouter,
 	pullRequests: pullRequestsRouter,
 	project: projectRouter,
+	ssh: sshRouter,
 	terminal: terminalRouter,
 	workspace: workspaceRouter,
 	workspaceCreation: workspaceCreationRouter,

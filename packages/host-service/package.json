@@ -46,6 +46,7 @@
 		"@hono/trpc-server": "^0.3.4",
 		"@octokit/rest": "^22.0.1",
 		"@superset/shared": "workspace:*",
+		"@superset/ssh": "workspace:*",
 		"@superset/trpc": "workspace:*",
 		"@superset/workspace-fs": "workspace:*",
 		"@t3-oss/env-core": "^0.13.8",

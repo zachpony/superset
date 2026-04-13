@@ -1,11 +1,12 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 import { getDeviceName, getHashedDeviceId } from "@superset/shared/device-info";
+import { SSHConnectionPool } from "@superset/ssh/connection";
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import simpleGit from "simple-git";
 import { z } from "zod";
-import { projects, workspaces } from "../../../db/schema";
+import { projects, sshHosts, workspaces } from "../../../db/schema";
 import type { HostServiceContext } from "../../../types";
 import { protectedProcedure, router } from "../../index";
 import { deduplicateBranchName } from "./utils/sanitize-branch";
@@ -475,6 +476,122 @@ export const workspaceCreationRouter = router({
 				initialCommands,
 				warnings: [] as string[],
 			};
+		}),
+
+	createSSHWorkspace: protectedProcedure
+		.input(
+			z.object({
+				projectId: z.string(),
+				sshHostId: z.string(),
+				remotePath: z.string().min(1),
+				branch: z.string().min(1),
+				workspaceName: z.string().optional(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			const host = ctx.db.query.sshHosts
+				.findFirst({ where: eq(sshHosts.id, input.sshHostId) })
+				.sync();
+
+			if (!host) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: `SSH host not found: ${input.sshHostId}`,
+				});
+			}
+
+			const pool = new SSHConnectionPool();
+			try {
+				await pool.connect({
+					id: host.id,
+					config: {
+						host: host.host,
+						port: host.port,
+						username: host.username,
+						privateKeyPath: host.privateKeyPath ?? undefined,
+						forwardAgent: host.forwardAgent === 1,
+						strictHostKeyChecking: "accept-new",
+						connectTimeout: host.connectTimeout,
+						keepaliveInterval: host.keepaliveInterval,
+						keepaliveCountMax: 3,
+					},
+				});
+			} catch (err) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: `SSH connection failed: ${err instanceof Error ? err.message : String(err)}`,
+				});
+			}
+
+			try {
+				const { code } = await pool.exec(
+					host.id,
+					`test -d ${JSON.stringify(input.remotePath)}`,
+				);
+				if (code !== 0) {
+					throw new TRPCError({
+						code: "BAD_REQUEST",
+						message: `Remote path does not exist: ${input.remotePath}`,
+					});
+				}
+			} finally {
+				await pool.disconnect(host.id);
+			}
+
+			const deviceClientId = getHashedDeviceId();
+			const deviceName = getDeviceName();
+
+			let cloudHost: { id: string };
+			try {
+				cloudHost = await ctx.api.device.ensureV2Host.mutate({
+					organizationId: ctx.organizationId,
+					machineId: deviceClientId,
+					name: deviceName,
+				});
+			} catch (err) {
+				throw new TRPCError({
+					code: "INTERNAL_SERVER_ERROR",
+					message: `Failed to register host: ${err instanceof Error ? err.message : String(err)}`,
+				});
+			}
+
+			const cloudRow = await ctx.api.v2Workspace.create
+				.mutate({
+					organizationId: ctx.organizationId,
+					projectId: input.projectId,
+					name:
+						input.workspaceName ??
+						`${host.name}:${input.branch}`,
+					branch: input.branch,
+					hostId: cloudHost.id,
+				})
+				.catch((err) => {
+					throw new TRPCError({
+						code: "INTERNAL_SERVER_ERROR",
+						message: `Cloud workspace creation failed: ${err instanceof Error ? err.message : String(err)}`,
+					});
+				});
+
+			if (!cloudRow) {
+				throw new TRPCError({
+					code: "INTERNAL_SERVER_ERROR",
+					message: "Cloud workspace create returned no row",
+				});
+			}
+
+			ctx.db
+				.insert(workspaces)
+				.values({
+					id: cloudRow.id,
+					projectId: input.projectId,
+					branch: input.branch,
+					executionMode: "ssh",
+					sshHostId: input.sshHostId,
+					remotePath: input.remotePath,
+				})
+				.run();
+
+			return { workspace: cloudRow };
 		}),
 
 	// ── GitHub endpoints for the link commands ────────────────────────

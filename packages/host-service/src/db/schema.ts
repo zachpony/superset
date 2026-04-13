@@ -92,6 +92,28 @@ export const pullRequests = sqliteTable(
 	],
 );
 
+export const sshHosts = sqliteTable(
+	"ssh_hosts",
+	{
+		id: text().primaryKey(),
+		name: text().notNull(),
+		host: text().notNull(),
+		port: integer().notNull().default(22),
+		username: text().notNull(),
+		privateKeyPath: text("private_key_path"),
+		forwardAgent: integer("forward_agent").notNull().default(1),
+		connectTimeout: integer("connect_timeout").notNull().default(30000),
+		keepaliveInterval: integer("keepalive_interval").notNull().default(15000),
+		lastConnectedAt: integer("last_connected_at"),
+		createdAt: integer("created_at")
+			.notNull()
+			.$defaultFn(() => Date.now()),
+	},
+	(table) => [
+		uniqueIndex("ssh_hosts_host_user_unique").on(table.host, table.username),
+	],
+);
+
 export const workspaces = sqliteTable(
 	"workspaces",
 	{
@@ -99,12 +121,17 @@ export const workspaces = sqliteTable(
 		projectId: text("project_id")
 			.notNull()
 			.references(() => projects.id, { onDelete: "cascade" }),
-		worktreePath: text("worktree_path").notNull(),
+		worktreePath: text("worktree_path"),
 		branch: text().notNull(),
 		headSha: text("head_sha"),
 		pullRequestId: text("pull_request_id").references(() => pullRequests.id, {
 			onDelete: "set null",
 		}),
+		executionMode: text("execution_mode").notNull().default("local"),
+		sshHostId: text("ssh_host_id").references(() => sshHosts.id, {
+			onDelete: "set null",
+		}),
+		remotePath: text("remote_path"),
 		createdAt: integer("created_at")
 			.notNull()
 			.$defaultFn(() => Date.now()),
@@ -113,5 +140,6 @@ export const workspaces = sqliteTable(
 		index("workspaces_project_id_idx").on(table.projectId),
 		index("workspaces_branch_idx").on(table.branch),
 		index("workspaces_pull_request_id_idx").on(table.pullRequestId),
+		index("workspaces_ssh_host_id_idx").on(table.sshHostId),
 	],
 );
