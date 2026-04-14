@@ -4,11 +4,13 @@ import { toast } from "@superset/ui/sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import {
+	HiOutlineFolderOpen,
 	HiOutlinePencilSquare,
 	HiOutlineSignal,
 	HiOutlineTrash,
 } from "react-icons/hi2";
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
+import { CreateSSHWorkspaceDialog } from "../CreateSSHWorkspaceDialog";
 
 interface SSHHost {
 	id: string;
@@ -32,6 +34,7 @@ export function SSHHostList({ hostUrl, onEdit }: SSHHostListProps) {
 	const queryClient = useQueryClient();
 	const [testingId, setTestingId] = useState<string | null>(null);
 	const [deletingId, setDeletingId] = useState<string | null>(null);
+	const [openFolderHost, setOpenFolderHost] = useState<SSHHost | null>(null);
 
 	const {
 		data: hosts = [],
@@ -122,57 +125,78 @@ export function SSHHostList({ hostUrl, onEdit }: SSHHostListProps) {
 	}
 
 	return (
-		<div className="space-y-2">
-			{hosts.map((host) => (
-				<Card key={host.id}>
-					<CardContent className="flex items-center justify-between py-3">
-						<div className="flex-1 min-w-0">
-							<div className="text-sm font-medium truncate">{host.name}</div>
-							<div className="text-xs text-muted-foreground truncate">
-								{host.username}@{host.host}:{host.port}
-							</div>
-							{host.lastConnectedAt && (
-								<div className="text-xs text-muted-foreground mt-0.5">
-									Last connected:{" "}
-									{new Date(host.lastConnectedAt).toLocaleString()}
+		<>
+			<div className="space-y-2">
+				{hosts.map((host) => (
+					<Card key={host.id}>
+						<CardContent className="flex items-center justify-between py-3">
+							<div className="flex-1 min-w-0">
+								<div className="text-sm font-medium truncate">{host.name}</div>
+								<div className="text-xs text-muted-foreground truncate">
+									{host.username}@{host.host}:{host.port}
 								</div>
-							)}
-						</div>
-						<div className="flex items-center gap-1 ml-3">
-							<Button
-								variant="ghost"
-								size="sm"
-								onClick={() => handleTestConnection(host.id)}
-								disabled={testingId === host.id}
-								title="Test connection"
-							>
-								<HiOutlineSignal className="h-4 w-4" />
-								{testingId === host.id ? (
-									<span className="ml-1 text-xs">Testing…</span>
-								) : null}
-							</Button>
-							<Button
-								variant="ghost"
-								size="sm"
-								onClick={() => onEdit(host)}
-								title="Edit"
-							>
-								<HiOutlinePencilSquare className="h-4 w-4" />
-							</Button>
-							<Button
-								variant="ghost"
-								size="sm"
-								onClick={() => handleDelete(host.id, host.name)}
-								disabled={deletingId === host.id}
-								title="Delete"
-							>
-								<HiOutlineTrash className="h-4 w-4 text-destructive" />
-							</Button>
-						</div>
-					</CardContent>
-				</Card>
-			))}
-		</div>
+								{host.lastConnectedAt && (
+									<div className="text-xs text-muted-foreground mt-0.5">
+										Last connected:{" "}
+										{new Date(host.lastConnectedAt).toLocaleString()}
+									</div>
+								)}
+							</div>
+							<div className="flex items-center gap-1 ml-3">
+								<Button
+									variant="ghost"
+									size="sm"
+									onClick={() => setOpenFolderHost(host)}
+									title="Open remote folder"
+								>
+									<HiOutlineFolderOpen className="h-4 w-4" />
+								</Button>
+								<Button
+									variant="ghost"
+									size="sm"
+									onClick={() => handleTestConnection(host.id)}
+									disabled={testingId === host.id}
+									title="Test connection"
+								>
+									<HiOutlineSignal className="h-4 w-4" />
+									{testingId === host.id ? (
+										<span className="ml-1 text-xs">Testing…</span>
+									) : null}
+								</Button>
+								<Button
+									variant="ghost"
+									size="sm"
+									onClick={() => onEdit(host)}
+									title="Edit"
+								>
+									<HiOutlinePencilSquare className="h-4 w-4" />
+								</Button>
+								<Button
+									variant="ghost"
+									size="sm"
+									onClick={() => handleDelete(host.id, host.name)}
+									disabled={deletingId === host.id}
+									title="Delete"
+								>
+									<HiOutlineTrash className="h-4 w-4 text-destructive" />
+								</Button>
+							</div>
+						</CardContent>
+					</Card>
+				))}
+			</div>
+
+			{openFolderHost && (
+				<CreateSSHWorkspaceDialog
+					open={!!openFolderHost}
+					onOpenChange={(open) => {
+						if (!open) setOpenFolderHost(null);
+					}}
+					hostUrl={hostUrl}
+					host={openFolderHost}
+				/>
+			)}
+		</>
 	);
 }
 

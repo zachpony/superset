@@ -481,7 +481,6 @@ export const workspaceCreationRouter = router({
 	createSSHWorkspace: protectedProcedure
 		.input(
 			z.object({
-				projectId: z.string(),
 				sshHostId: z.string(),
 				remotePath: z.string().min(1),
 				branch: z.string().min(1),
@@ -523,6 +522,7 @@ export const workspaceCreationRouter = router({
 				});
 			}
 
+			let remoteBranch = input.branch;
 			try {
 				const { code } = await pool.exec(
 					host.id,
@@ -534,62 +534,59 @@ export const workspaceCreationRouter = router({
 						message: `Remote path does not exist: ${input.remotePath}`,
 					});
 				}
+
+				if (input.branch === "__auto__") {
+					const { stdout } = await pool.exec(
+						host.id,
+						`cd ${JSON.stringify(input.remotePath)} && git rev-parse --abbrev-ref HEAD 2>/dev/null || echo main`,
+					);
+					remoteBranch = stdout.trim() || "main";
+				}
 			} finally {
 				await pool.disconnect(host.id);
 			}
 
-			const deviceClientId = getHashedDeviceId();
-			const deviceName = getDeviceName();
+			const workspaceId = crypto.randomUUID();
+			const workspaceName =
+				input.workspaceName || `${host.name}:${remoteBranch}`;
 
-			let cloudHost: { id: string };
-			try {
-				cloudHost = await ctx.api.device.ensureV2Host.mutate({
-					organizationId: ctx.organizationId,
-					machineId: deviceClientId,
-					name: deviceName,
-				});
-			} catch (err) {
-				throw new TRPCError({
-					code: "INTERNAL_SERVER_ERROR",
-					message: `Failed to register host: ${err instanceof Error ? err.message : String(err)}`,
-				});
-			}
+			const projectId = `ssh-${host.id}`;
+			const existingProject = ctx.db.query.projects
+				.findFirst({ where: eq(projects.id, projectId) })
+				.sync();
 
-			const cloudRow = await ctx.api.v2Workspace.create
-				.mutate({
-					organizationId: ctx.organizationId,
-					projectId: input.projectId,
-					name: input.workspaceName ?? `${host.name}:${input.branch}`,
-					branch: input.branch,
-					hostId: cloudHost.id,
-				})
-				.catch((err) => {
-					throw new TRPCError({
-						code: "INTERNAL_SERVER_ERROR",
-						message: `Cloud workspace creation failed: ${err instanceof Error ? err.message : String(err)}`,
-					});
-				});
-
-			if (!cloudRow) {
-				throw new TRPCError({
-					code: "INTERNAL_SERVER_ERROR",
-					message: "Cloud workspace create returned no row",
-				});
+			if (!existingProject) {
+				ctx.db
+					.insert(projects)
+					.values({
+						id: projectId,
+						repoPath: input.remotePath,
+						repoOwner: host.username,
+						repoName: input.remotePath.split("/").pop() || "remote",
+					})
+					.run();
 			}
 
 			ctx.db
 				.insert(workspaces)
 				.values({
-					id: cloudRow.id,
-					projectId: input.projectId,
-					branch: input.branch,
+					id: workspaceId,
+					projectId,
+					branch: remoteBranch,
 					executionMode: "ssh",
 					sshHostId: input.sshHostId,
 					remotePath: input.remotePath,
 				})
 				.run();
 
-			return { workspace: cloudRow };
+			return {
+				workspace: {
+					id: workspaceId,
+					name: workspaceName,
+					branch: remoteBranch,
+					projectId,
+				},
+			};
 		}),
 
 	// ── GitHub endpoints for the link commands ────────────────────────
