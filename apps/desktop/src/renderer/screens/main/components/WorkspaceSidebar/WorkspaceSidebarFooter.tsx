@@ -3,12 +3,16 @@ import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
+	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
 import { toast } from "@superset/ui/sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { LuFolderGit, LuFolderOpen, LuFolderPlus } from "react-icons/lu";
+import { MdOutlineComputer } from "react-icons/md";
+import { OpenSSHFolderDialog } from "renderer/components/OpenSSHFolderDialog";
 import { useOpenProject } from "renderer/react-query/projects";
 import { useOpenMainRepoWorkspace } from "renderer/react-query/workspaces";
 import { STROKE_WIDTH } from "./constants";
@@ -23,6 +27,7 @@ export function WorkspaceSidebarFooter({
 	const navigate = useNavigate();
 	const { openNew, isPending: isOpenPending } = useOpenProject();
 	const openMainRepoWorkspace = useOpenMainRepoWorkspace();
+	const [sshDialogOpen, setSshDialogOpen] = useState(false);
 
 	const handleOpenProject = async () => {
 		try {
@@ -78,8 +83,17 @@ export function WorkspaceSidebarFooter({
 							<LuFolderGit className="size-4" strokeWidth={STROKE_WIDTH} />
 							New project
 						</DropdownMenuItem>
+						<DropdownMenuSeparator />
+						<DropdownMenuItem onClick={() => setSshDialogOpen(true)}>
+							<MdOutlineComputer className="size-4" />
+							SSH Remote…
+						</DropdownMenuItem>
 					</DropdownMenuContent>
 				</DropdownMenu>
+				<OpenSSHFolderDialog
+					open={sshDialogOpen}
+					onOpenChange={setSshDialogOpen}
+				/>
 			</div>
 		);
 	}
@@ -107,8 +121,17 @@ export function WorkspaceSidebarFooter({
 						<LuFolderGit className="size-4" strokeWidth={STROKE_WIDTH} />
 						New project
 					</DropdownMenuItem>
+					<DropdownMenuSeparator />
+					<DropdownMenuItem onClick={() => setSshDialogOpen(true)}>
+						<MdOutlineComputer className="size-4" />
+						SSH Remote…
+					</DropdownMenuItem>
 				</DropdownMenuContent>
 			</DropdownMenu>
+			<OpenSSHFolderDialog
+				open={sshDialogOpen}
+				onOpenChange={setSshDialogOpen}
+			/>
 		</div>
 	);
 }

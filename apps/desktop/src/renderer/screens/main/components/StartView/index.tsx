@@ -3,6 +3,8 @@ import { cn } from "@superset/ui/utils";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { LuFolderOpen, LuPlus, LuX } from "react-icons/lu";
+import { MdOutlineComputer } from "react-icons/md";
+import { OpenSSHFolderDialog } from "renderer/components/OpenSSHFolderDialog";
 import { useOpenProject } from "renderer/react-query/projects";
 import { SupersetLogo } from "renderer/routes/sign-in/components/SupersetLogo";
 
@@ -11,6 +13,7 @@ export function StartView() {
 	const { openNew, openFromPath, isPending } = useOpenProject();
 	const [error, setError] = useState<string | null>(null);
 	const [isDragOver, setIsDragOver] = useState(false);
+	const [sshDialogOpen, setSshDialogOpen] = useState(false);
 
 	useEffect(() => {
 		if (!error) return;
@@ -194,7 +197,33 @@ export function StartView() {
 								New Project
 							</Button>
 						</div>
+
+						<div
+							className={cn(
+								"flex items-center justify-center gap-2 transition-opacity",
+								isDragOver && "opacity-0",
+							)}
+						>
+							<span className="text-sm text-muted-foreground">
+								Or open from remote server
+							</span>
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => setSshDialogOpen(true)}
+								disabled={isPending}
+								className="text-sm"
+							>
+								<MdOutlineComputer className="size-3.5" />
+								SSH Remote
+							</Button>
+						</div>
 					</div>
+
+					<OpenSSHFolderDialog
+						open={sshDialogOpen}
+						onOpenChange={setSshDialogOpen}
+					/>
 
 					{error && !isDragOver && (
 						<div className="mt-5 w-full flex items-start gap-2 rounded-md px-4 py-3 bg-destructive/10 border border-destructive/20">
