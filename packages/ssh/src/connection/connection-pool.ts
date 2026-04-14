@@ -157,6 +157,28 @@ export class SSHConnectionPool {
 		return entry.client;
 	}
 
+	/** Wait for a connection to reach "connected" state (or throw on failure/timeout). */
+	async getClientAsync(id: string, timeoutMs = 30_000): Promise<Client> {
+		const deadline = Date.now() + timeoutMs;
+		while (Date.now() < deadline) {
+			const entry = this.connections.get(id);
+			if (!entry) {
+				throw new Error(`SSH connection ${id} not found`);
+			}
+			if (entry.state === "connected") {
+				return entry.client;
+			}
+			if (entry.state === "disconnected") {
+				throw new Error(`SSH connection ${id} failed to connect`);
+			}
+			// still "connecting" or "reconnecting" — wait 100ms and retry
+			await new Promise<void>((r) => setTimeout(r, 100));
+		}
+		throw new Error(
+			`SSH connection ${id} timed out after ${timeoutMs}ms waiting for ready state`,
+		);
+	}
+
 	getState(id: string): PooledConnection["state"] | "not_found" {
 		return this.connections.get(id)?.state ?? "not_found";
 	}
@@ -165,7 +187,7 @@ export class SSHConnectionPool {
 		id: string,
 		command: string,
 	): Promise<{ stdout: string; stderr: string; code: number }> {
-		const client = this.getClient(id);
+		const client = await this.getClientAsync(id);
 		return new Promise((resolve, reject) => {
 			client.exec(command, (err, channel) => {
 				if (err) return reject(err);
@@ -188,7 +210,7 @@ export class SSHConnectionPool {
 		id: string,
 		options?: { cols?: number; rows?: number; term?: string },
 	): Promise<ClientChannel> {
-		const client = this.getClient(id);
+		const client = await this.getClientAsync(id);
 		return new Promise((resolve, reject) => {
 			client.shell(
 				{
@@ -205,7 +227,7 @@ export class SSHConnectionPool {
 	}
 
 	async sftp(id: string): Promise<SFTPWrapper> {
-		const client = this.getClient(id);
+		const client = await this.getClientAsync(id);
 		return new Promise((resolve, reject) => {
 			client.sftp((err, sftp) => {
 				if (err) return reject(err);

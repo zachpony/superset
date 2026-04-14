@@ -115,20 +115,27 @@ export class WorkspaceFilesystemManager {
 			const connectionId = host.id;
 
 			if (pool.getState(connectionId) === "not_found") {
-				pool.connect({
-					id: connectionId,
-					config: {
-						host: host.host,
-						port: host.port,
-						username: host.username,
-						privateKeyPath: host.privateKeyPath ?? undefined,
-						forwardAgent: host.forwardAgent === 1,
-						connectTimeout: host.connectTimeout,
-						keepaliveInterval: host.keepaliveInterval,
-						keepaliveCountMax: 3,
-						strictHostKeyChecking: "accept-new",
-					},
-				});
+				pool
+					.connect({
+						id: connectionId,
+						config: {
+							host: host.host,
+							port: host.port,
+							username: host.username,
+							privateKeyPath: host.privateKeyPath ?? undefined,
+							forwardAgent: host.forwardAgent === 1,
+							connectTimeout: host.connectTimeout,
+							keepaliveInterval: host.keepaliveInterval,
+							keepaliveCountMax: 3,
+							strictHostKeyChecking: "accept-new",
+						},
+					})
+					.catch((err) => {
+						console.error(
+							`[filesystem] SSH connection failed for host ${connectionId}:`,
+							err,
+						);
+					});
 			}
 
 			service = new SftpFsService(
