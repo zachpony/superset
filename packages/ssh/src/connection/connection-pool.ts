@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { resolve } from "node:path";
+import { resolve, join } from "node:path";
 import type { ClientChannel, SFTPWrapper } from "ssh2";
 import { Client } from "ssh2";
 import type { SSHConnectionOptions, SSHHostConfig } from "./types";
@@ -105,6 +105,21 @@ export class SSHConnectionPool {
 				}
 			} else if (config.password) {
 				connectConfig.password = config.password;
+			} else if (!config.forwardAgent) {
+				// No explicit key, no password, no agent — try default key locations
+				const defaultKeys = [
+					join(homedir(), ".ssh", "id_ed25519"),
+					join(homedir(), ".ssh", "id_rsa"),
+					join(homedir(), ".ssh", "id_ecdsa"),
+				];
+				for (const keyPath of defaultKeys) {
+					try {
+						connectConfig.privateKey = readFileSync(keyPath);
+						break;
+					} catch {
+						// try next
+					}
+				}
 			}
 
 			entry.client.connect(connectConfig as Parameters<Client["connect"]>[0]);
