@@ -60,7 +60,7 @@ function applyConfigKey(
 			block.user = value;
 			break;
 		case "identityfile":
-			block.identityFile = value;
+			block.identityFile = value.replace(/^~/, homedir());
 			break;
 		case "forwardagent":
 			block.forwardAgent = value.toLowerCase() === "yes";

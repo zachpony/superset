@@ -1,4 +1,6 @@
 import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { resolve } from "node:path";
 import type { ClientChannel, SFTPWrapper } from "ssh2";
 import { Client } from "ssh2";
 import type { SSHConnectionOptions, SSHHostConfig } from "./types";
@@ -87,14 +89,17 @@ export class SSHConnectionPool {
 			};
 
 			if (config.privateKeyPath) {
+				const expandedPath = resolve(
+					config.privateKeyPath.replace(/^~/, homedir()),
+				);
 				try {
-					connectConfig.privateKey = readFileSync(config.privateKeyPath);
+					connectConfig.privateKey = readFileSync(expandedPath);
 					if (config.passphrase) {
 						connectConfig.passphrase = config.passphrase;
 					}
 				} catch {
 					reject(
-						new Error(`Failed to read private key: ${config.privateKeyPath}`),
+						new Error(`Failed to read private key: ${expandedPath}`),
 					);
 					return;
 				}
