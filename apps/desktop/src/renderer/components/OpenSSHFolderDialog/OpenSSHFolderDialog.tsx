@@ -85,14 +85,14 @@ export function OpenSSHFolderDialog({
 					},
 				);
 
-				toast.success(`已打开远程项目 "${result.workspace.name}"`);
+				toast.success(`Opened remote project "${result.workspace.name}"`);
 				setRemotePath("");
 				setSelectedHostId("");
 				onOpenChange(false);
 				onSuccess?.(result.workspace.id);
 			} catch (err) {
 				toast.error(
-					`连接失败: ${err instanceof Error ? err.message : String(err)}`,
+					`Connection failed: ${err instanceof Error ? err.message : String(err)}`,
 				);
 			} finally {
 				setIsPending(false);
@@ -105,27 +105,27 @@ export function OpenSSHFolderDialog({
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="sm:max-w-md">
 				<DialogHeader>
-					<DialogTitle>打开远程服务器项目</DialogTitle>
+					<DialogTitle>Open Remote SSH Project</DialogTitle>
 					<DialogDescription>
-						通过 SSH 连接到远程服务器，打开其上的项目目录
+						Connect to a remote server via SSH and open a project directory
 					</DialogDescription>
 				</DialogHeader>
 
 				{!activeHostUrl ? (
 					<p className="text-sm text-muted-foreground py-4 text-center">
-						正在等待 Host Service 启动…
+						Waiting for host service to start…
 					</p>
 				) : (
 					<form onSubmit={handleSubmit} className="space-y-4 pt-2">
 						<div className="space-y-1.5">
 							<Label className="text-sm font-medium">
-								SSH 主机 <span className="text-destructive">*</span>
+								SSH Host <span className="text-destructive">*</span>
 							</Label>
 							{hostsLoading ? (
 								<div className="h-9 rounded-md bg-muted/50 animate-pulse" />
 							) : hosts.length === 0 ? (
 								<div className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
-									未配置 SSH 主机。请先在 Settings → SSH 中添加。
+									No SSH hosts configured. Add one in Settings → SSH.
 								</div>
 							) : (
 								<Select
@@ -134,7 +134,7 @@ export function OpenSSHFolderDialog({
 									disabled={isPending}
 								>
 									<SelectTrigger>
-										<SelectValue placeholder="选择 SSH 主机…" />
+										<SelectValue placeholder="Select SSH host…" />
 									</SelectTrigger>
 									<SelectContent>
 										{hosts.map((host) => (
@@ -152,7 +152,7 @@ export function OpenSSHFolderDialog({
 
 						<div className="space-y-1.5">
 							<Label htmlFor="ssh-remote-path" className="text-sm font-medium">
-								远程路径 <span className="text-destructive">*</span>
+								Remote Path <span className="text-destructive">*</span>
 							</Label>
 							<Input
 								id="ssh-remote-path"
@@ -167,7 +167,7 @@ export function OpenSSHFolderDialog({
 								autoFocus={hosts.length > 0}
 							/>
 							<p className="text-xs text-muted-foreground">
-								远程服务器上项目目录的绝对路径
+								Absolute path to the project directory on the remote server
 							</p>
 						</div>
 
@@ -178,13 +178,13 @@ export function OpenSSHFolderDialog({
 								onClick={() => onOpenChange(false)}
 								disabled={isPending}
 							>
-								取消
+								Cancel
 							</Button>
 							<Button
 								type="submit"
 								disabled={isPending || hosts.length === 0 || !selectedHostId}
 							>
-								{isPending ? "连接中…" : "打开项目"}
+								{isPending ? "Connecting…" : "Open Project"}
 							</Button>
 						</div>
 					</form>

@@ -2,7 +2,7 @@ import { Button } from "@superset/ui/button";
 import { cn } from "@superset/ui/utils";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { LuFolderOpen, LuPlus, LuX } from "react-icons/lu";
+import { LuFolderOpen, LuPlus, LuSettings, LuX } from "react-icons/lu";
 import { MdOutlineComputer } from "react-icons/md";
 import { OpenSSHFolderDialog } from "renderer/components/OpenSSHFolderDialog";
 import { useOpenProject } from "renderer/react-query/projects";
@@ -124,6 +124,18 @@ export function StartView() {
 
 	return (
 		<div className="flex flex-col h-full w-full relative overflow-hidden bg-background">
+			{/* Settings button — top right corner */}
+			<div className="absolute top-3 right-3 z-10">
+				<Button
+					variant="ghost"
+					size="icon"
+					onClick={() => navigate({ to: "/settings/account" })}
+					aria-label="Open settings"
+					className="size-8 text-muted-foreground hover:text-foreground no-drag"
+				>
+					<LuSettings className="size-4" />
+				</Button>
+			</div>
 			{/* biome-ignore lint/a11y/noStaticElementInteractions: Drop zone for external files */}
 			<div
 				className="relative flex flex-1 items-center justify-center"

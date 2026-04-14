@@ -40,10 +40,13 @@ export function LocalHostServiceProvider({
 		[collections],
 	);
 
-	const organizationIds = useMemo(
-		() => organizations?.map((organization) => organization.id) ?? [],
-		[organizations],
-	);
+	const organizationIds = useMemo(() => {
+		const ids = organizations?.map((organization) => organization.id) ?? [];
+		if (env.SKIP_ENV_VALIDATION && !ids.includes(MOCK_ORG_ID)) {
+			return [...ids, MOCK_ORG_ID];
+		}
+		return ids;
+	}, [organizations]);
 
 	useEffect(() => {
 		for (const organizationId of organizationIds) {

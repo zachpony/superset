@@ -15,11 +15,14 @@ export const createHostServiceCoordinatorRouter = () => {
 		start: publicProcedure.input(orgInput).mutation(async ({ input }) => {
 			const coordinator = getHostServiceCoordinator();
 			const { token } = await loadToken();
-			if (!token) {
+			const isDevMode =
+				process.env.NODE_ENV === "development" &&
+				!!process.env.SKIP_ENV_VALIDATION;
+			if (!token && !isDevMode) {
 				throw new Error("No auth token available — user must be logged in");
 			}
 			return coordinator.start(input.organizationId, {
-				authToken: token,
+				authToken: token ?? "dev-placeholder",
 				cloudApiUrl: env.NEXT_PUBLIC_API_URL,
 			});
 		}),
@@ -37,11 +40,14 @@ export const createHostServiceCoordinatorRouter = () => {
 		restart: publicProcedure.input(orgInput).mutation(async ({ input }) => {
 			const coordinator = getHostServiceCoordinator();
 			const { token } = await loadToken();
-			if (!token) {
+			const isDevMode =
+				process.env.NODE_ENV === "development" &&
+				!!process.env.SKIP_ENV_VALIDATION;
+			if (!token && !isDevMode) {
 				throw new Error("No auth token available — user must be logged in");
 			}
 			return coordinator.restart(input.organizationId, {
-				authToken: token,
+				authToken: token ?? "dev-placeholder",
 				cloudApiUrl: env.NEXT_PUBLIC_API_URL,
 			});
 		}),

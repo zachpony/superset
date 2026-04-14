@@ -35,7 +35,8 @@ export const NOTIFICATION_EVENTS = {
 } as const;
 
 // Development/testing mock values (used when SKIP_ENV_VALIDATION is set)
-export const MOCK_ORG_ID = "mock-org-id";
+// Must be a valid UUID because the host-service validates ORGANIZATION_ID with z.string().uuid()
+export const MOCK_ORG_ID = "49b38586-84bc-4b58-837e-85aa6e513434";
 
 // Terminal defaults
 export const DEFAULT_TERMINAL_SCROLLBACK = 5000;
